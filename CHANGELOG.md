@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remotes, which Puppet would have sent to PBS if it was not replaced. The key is omitted, and
   `--remote-password-placeholder` still adds a marker on request.
 
+### Changed
+
+- The Quality workflow also runs the unit tests on OpenVox 9.
+- Data JT banner and an About section in the README; `metadata.json` names Data JT as the
+  author.
+
 ## [0.1.0] - 2026-11-06
 
 Initial release.

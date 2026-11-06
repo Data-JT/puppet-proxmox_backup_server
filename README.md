@@ -1,3 +1,10 @@
+<a href="https://www.data-jt.de">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Data-JT/.github/main/profile/banner-dark.svg">
+    <img alt="Data JT" src="https://raw.githubusercontent.com/Data-JT/.github/main/profile/banner-light.svg" width="420">
+  </picture>
+</a>
+
 # datajt-proxmox_backup_server
 
 Manage Proxmox Backup Server configuration as Puppet code, through the PBS REST API.
@@ -12,6 +19,7 @@ Manage Proxmox Backup Server configuration as Puppet code, through the PBS REST 
 6. [Limitations](#limitations)
 7. [Contributing](#contributing)
 8. [License](#license)
+9. [About Data JT](#about-data-jt)
 
 ## Description
 
@@ -63,9 +71,8 @@ why the agent runs as root on the node.
 
 ## Requirements
 
-- Puppet or OpenVox 8 or 9 (`>= 8.0.0 < 10.0.0`). Testing is currently done on 8 (CI and
-  production); on 9 the unit tests pass (OpenVox 9.3), but there is no CI job or production
-  use yet. No Forge dependencies; the Resource API ships with Puppet.
+- Puppet or OpenVox 8 or 9 (`>= 8.0.0 < 10.0.0`). Testing is currently done on 8 (CI and production); on 9 the unit tests also run in CI
+  (OpenVox 9.3), but there is no production use yet. No Forge dependencies; the Resource API ships with Puppet.
 - Debian 12 (PBS 3.x) or Debian 13 (PBS 4.x). Tested against PBS 4.2.1.
 - The Puppet agent running as root on the PBS node.
 - A PBS API token with the permissions for the objects you manage.
@@ -218,3 +225,10 @@ for reporting vulnerabilities.
 ## License
 
 Apache-2.0, see [LICENSE](https://github.com/Data-JT/puppet-proxmox_backup_server/blob/master/LICENSE).
+
+## About Data JT
+
+This module is built and maintained by [Data JT](https://www.data-jt.de), an IT and data
+protection consultancy near Freiburg, Germany. All our modules are on the
+[Puppet Forge](https://forge.puppet.com/modules/datajt). For anything beyond issues and pull
+requests, [get in touch](https://www.data-jt.de/kontakt).
