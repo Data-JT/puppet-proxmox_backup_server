@@ -1,0 +1,50 @@
+{
+  "description": "Call any Proxmox Backup Server API endpoint exposed by /api2/json.",
+  "input_method": "stdin",
+  "parameters": {
+    "host": {
+      "description": "PBS host name or IP address.",
+      "type": "String[1]"
+    },
+    "port": {
+      "description": "PBS API port.",
+      "type": "Optional[Integer[1, 65535]]"
+    },
+    "token_id": {
+      "description": "PBS API token ID, for example puppet@pbs!puppet-token.",
+      "type": "String[1]"
+    },
+    "token_secret": {
+      "description": "PBS API token secret.",
+      "type": "Sensitive[String[1]]"
+    },
+    "method": {
+      "description": "HTTP method.",
+      "type": "Enum['GET', 'POST', 'PUT', 'DELETE']"
+    },
+    "path": {
+      "description": "API path below /api2/json, for example /version or /config/datastore/{name}.",
+      "type": "Pattern[/^\\//]"
+    },
+    "path_params": {
+      "description": "Path template values for placeholders such as {name}.",
+      "type": "Optional[Hash[String, Any]]"
+    },
+    "query": {
+      "description": "Query string parameters.",
+      "type": "Optional[Hash[String, Any]]"
+    },
+    "body": {
+      "description": "JSON request body parameters.",
+      "type": "Optional[Hash[String, Any]]"
+    },
+    "ssl_verify": {
+      "description": "Verify the PBS TLS certificate. Defaults to true.",
+      "type": "Optional[Boolean]"
+    },
+    "ssl_ca_file": {
+      "description": "Optional CA bundle path.",
+      "type": "Optional[String[1]]"
+    }
+  }
+}

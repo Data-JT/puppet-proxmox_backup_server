@@ -1,0 +1,23 @@
+<%- |
+  String           $host,
+  Integer          $port,
+  String           $token_id,
+  String           $token_secret,
+  Boolean           $ssl_verify,
+  Optional[String]  $ssl_ca_file,
+  Optional[Integer] $task_timeout,
+| -%>
+# Puppet-managed PBS transport configuration.
+# Read by the proxmox_backup_server providers at agent run time.
+---
+host: '<%= regsubst($host, "'", "''", 'G') %>'
+port: <%= $port %>
+token_id: '<%= regsubst($token_id, "'", "''", 'G') %>'
+token_secret: '<%= regsubst($token_secret, "'", "''", 'G') %>'
+ssl_verify: <%= $ssl_verify %>
+<% if $ssl_ca_file { -%>
+ssl_ca_file: '<%= regsubst($ssl_ca_file, "'", "''", 'G') %>'
+<% } -%>
+<% if $task_timeout =~ NotUndef { -%>
+task_timeout: <%= $task_timeout %>
+<% } -%>

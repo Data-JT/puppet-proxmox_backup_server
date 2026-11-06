@@ -1,0 +1,212 @@
+---
+# Reek configuration. The layout is shared by puppet-proxmox_virtual_environment,
+# puppet-proxmox_backup_server and puppet-proxmox_datacenter_manager.
+#
+# CI runs Reek with a zero-warning baseline, so every exception is explicit,
+# named and commented. Exceptions live only in this file: the code carries no
+# inline :reek: comments.
+#
+# The single `detectors` mapping has two sections. Reek cannot merge two
+# entries for the same detector, so each detector appears in exactly one:
+#
+#   1. Shared base, identical in all three modules: threshold tuning for the
+#      method shapes the Puppet Resource API mandates, and the exceptions those
+#      detectors need in any of the modules.
+#   2. Module-specific: named, per-location exceptions for this module only.
+#
+# A string under `exclude` matches every context whose full name contains it
+# ("Class" or "Class#method"); a string written as "/.../" is a regular
+# expression.
+detectors:
+  # --- 1. Shared base -------------------------------------------------------
+  DataClump:
+    # The Resource API's create/update/delete callbacks share
+    # (context, name[, should]) by contract: exactly three methods. Raising
+    # max_copies from 2 to 3 stops flagging that mandatory CRUD shape while
+    # still catching a clump across four or more methods.
+    max_copies: 3
+    exclude:
+      # Each transport's HTTP verb helpers share (context, path, body, query).
+      - "/\\APuppet::Transport::Proxmox[A-Za-z]+\\z/"
+      # proxmox_virtual_environment only: providers that pass (context, name)
+      # to one helper beyond the CRUD triple, and the SDN providers that thread
+      # (context, should) and (context, vnet) through their path helpers.
+      - "Puppet::Provider::PveBackupJob::ProxmoxVirtualEnvironment"
+      - "Puppet::Provider::PveRole::ProxmoxVirtualEnvironment"
+      - "Puppet::Provider::PveSdnBaseProvider"
+      - "Puppet::Provider::PveSdnSubnet::ProxmoxVirtualEnvironment"
+      - "Puppet::Provider::PveStorage::ProxmoxVirtualEnvironment"
+      - "Puppet::Provider::PveUser::ProxmoxVirtualEnvironment"
+  LongParameterList:
+    # insync?(context, name, attribute_name, is, should) is the Resource API's
+    # mandated callback signature. Raising max_params from 3 to 5 stops
+    # flagging that contract while still catching six or more parameters.
+    max_params: 5
+    exclude:
+      # Each transport's generic call(context, method, path, body:, query:,
+      # path_params:) is the public request boundary; keyword arguments keep
+      # its call sites clear.
+      - "/\\APuppet::Transport::Proxmox[A-Za-z]+#call\\z/"
+
+  # --- 2. Module-specific (proxmox_backup_server) -------------------------
+  Attribute:
+    # The transport exposes this state for the once-per-process TLS warning.
+    exclude:
+      - "Puppet::Transport::ProxmoxBackupServer#ssl_warning_emitted"
+      # SecretStore.config_dir is writable purely as a test seam, so specs can
+      # point the store at a fixture tree instead of a real /etc/proxmox-backup.
+      - "PuppetX::ProxmoxBackupServer::SecretStore#config_dir"
+  BooleanParameter:
+    # The provider's request-body helper mirrors the API update contract.
+    exclude:
+      - "Puppet::Provider::PbsBaseProvider#request_body"
+  ControlParameter:
+    # Resource API callbacks and transport dispatch select behavior from their required arguments.
+    # The notification-target secret hooks dispatch on the attribute by design: one target type
+    # keeps a scalar secret and another an array of them.
+    exclude:
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#secret_matches?"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#secret_placeholder"
+      - "Puppet::Provider::PbsBaseProvider#insync?"
+      - "Puppet::Provider::PbsBaseProvider#request_body"
+      - "Puppet::Transport::ProxmoxBackupServer#call"
+  DuplicateMethodCall:
+    # These short integration methods intentionally repeat access to external API data.
+    exclude:
+      - "Puppet::Provider::PbsBaseProvider#pbs_to_puppet"
+      - "Puppet::Provider::PbsBaseProvider#puppet_to_pbs"
+      - "Puppet::Transport::ProxmoxBackupServer#initialize"
+      # The repeated [:description] read is the idiomatic chomp-if-String guard;
+      # extracting a local would not make it clearer.
+      # path.inspect recurs only across mutually exclusive error branches;
+      # hoisting it would build the string on every happy-path call.
+      # The two Process.clock_gettime reads are distinct timestamps (start and
+      # now) for the elapsed-time deadline, not a redundant call.
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer#canonicalize"
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer#get"
+      - "Puppet::Transport::ProxmoxBackupServer#sanitize_path"
+      - "Puppet::Transport::ProxmoxBackupServer#validate_expanded_path"
+      - "Puppet::Transport::ProxmoxBackupServer#wait_for_task"
+  FeatureEnvy:
+    # These methods translate API payloads or configure external HTTP objects.
+    exclude:
+      - "Puppet::Provider::PbsAcl::ProxmoxBackupServer#acl_body"
+      - "Puppet::Provider::PbsAcl::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer#parse_tokenid!"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer#validate_userid!"
+      - "Puppet::Transport::ProxmoxBackupServer#handle_response"
+      - "Puppet::Transport::ProxmoxBackupServer#http_connection"
+      - "Puppet::Transport::ProxmoxBackupServer#sanitize_path"
+      - "Puppet::Transport::ProxmoxBackupServer#validate_expanded_path"
+      # Referencing the memoized transport twice (delete, then wait_for_task) is
+      # deliberate orchestration, not misplaced behaviour.
+      - "Puppet::Provider::PbsDatastore::ProxmoxBackupServer#delete"
+  InstanceVariableAssumption:
+    # Providers retain discovery and transport state across Resource API callbacks.
+    exclude:
+      - "Puppet::Provider::PbsBaseProvider"
+      - "Puppet::Provider::PbsDatastore::ProxmoxBackupServer"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer"
+      - "Puppet::Provider::PbsRealm::ProxmoxBackupServer"
+  ManualDispatch:
+    # These methods dispatch to the API transport or unwrap sensitive values conditionally.
+    exclude:
+      - "Puppet::Provider::PbsBaseProvider#puppet_to_pbs"
+      - "Puppet::Transport::ProxmoxBackupServer#initialize"
+      # SecretComparison#unwrap_secret accepts a declared value that may or may
+      # not be Sensitive.
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#unwrap_secret"
+  MissingSafeMethod:
+    # Bang helpers deliberately validate inputs before a provider or transport operation.
+    exclude:
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer"
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer"
+      - "Puppet::Transport::ProxmoxBackupServer"
+  NestedIterators:
+    # List endpoints return nested resource collections that must be flattened.
+    exclude:
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsBaseProvider#refresh_changes"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsRealm::ProxmoxBackupServer#get"
+  NilCheck:
+    # Optional API fields and transport configuration require explicit nil handling.
+    exclude:
+      - "Puppet::Provider::PbsBaseProvider#pbs_transport"
+      - "Puppet::Provider::PbsBaseProvider#puppet_to_pbs"
+      - "Puppet::Provider::PbsS3Endpoint::ProxmoxBackupServer#create"
+      - "Puppet::Transport::ProxmoxBackupServer#handle_response"
+      - "Puppet::Transport::ProxmoxBackupServer#validate_connection_info!"
+      # Crypt, SecretComparison and SecretStore distinguish "PBS holds no secret"
+      # from "the value is absent from the catalog"; collapsing the two would
+      # reintroduce the silent no-op secret drift detection exists to remove.
+      - "PuppetX::ProxmoxBackupServer::Crypt#self.generate_hash"
+      - "PuppetX::ProxmoxBackupServer::Crypt#self.hash_password"
+      - "PuppetX::ProxmoxBackupServer::Crypt#self.verify"
+      - "PuppetX::ProxmoxBackupServer::Crypt#self.yescrypt_setting"
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#secret_drifted?"
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#secret_placeholders"
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#unwrap_secret"
+      - "PuppetX::ProxmoxBackupServer::SecretStore#field_value"
+      - "PuppetX::ProxmoxBackupServer::SecretStore#remote_password"
+      - "PuppetX::ProxmoxBackupServer::SecretStore#section_fields"
+      - "PuppetX::ProxmoxBackupServer::SecretStore#user_password?"
+  TooManyInstanceVariables:
+    # The transport stores independent connection settings and request state.
+    exclude:
+      - "Puppet::Transport::ProxmoxBackupServer"
+  TooManyMethods:
+    # The transport centralizes its public HTTP and response-handling contract.
+    exclude:
+      - "Puppet::Transport::ProxmoxBackupServer"
+  TooManyStatements:
+    # These integration methods are clearer as one linear API operation.
+    # ShadowWriter#persist is the atomic-write sequence itself (ownership, write, flush, fsync,
+    # close, rename); splitting it would only scatter the same calls across methods.
+    exclude:
+      # The transport constructor reads the connection settings it is given,
+      # one statement per key. Reek excludes initialize by default, but an
+      # explicit exclude list replaces that default, so it is restated here.
+      - "Puppet::Transport::ProxmoxBackupServer#initialize"
+      - "PuppetX::ProxmoxBackupServer::ShadowWriter#persist"
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer#persist_secret"
+      - "Puppet::Provider::PbsBaseProvider#pbs_to_puppet"
+      - "Puppet::Provider::PbsBaseProvider#puppet_to_pbs"
+      - "Puppet::Provider::PbsBaseProvider#refresh_changes"
+      - "Puppet::Provider::PbsBaseProvider#request_body"
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsRealm::ProxmoxBackupServer#get"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer#create"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer#update"
+      - "Puppet::Transport::ProxmoxBackupServer#handle_response"
+      - "Puppet::Transport::ProxmoxBackupServer#http_connection"
+      - "Puppet::Transport::ProxmoxBackupServer#request"
+      - "Puppet::Transport::ProxmoxBackupServer#wait_for_task"
+  UtilityFunction:
+    # These helpers belong with the provider or transport that defines their Resource API behavior.
+    # stored_secret and secret_matches? are per-provider overrides of the SecretComparison contract,
+    # so they must stay instance methods even where the body needs no instance state.
+    exclude:
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#property_string"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#secret_pair"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#values_match?"
+      - "Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer#stored_secret"
+      - "Puppet::Provider::PbsRealm::ProxmoxBackupServer#stored_secret"
+      - "Puppet::Provider::PbsRemote::ProxmoxBackupServer#stored_secret"
+      - "Puppet::Provider::PbsS3Endpoint::ProxmoxBackupServer#stored_secret"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer#secret_matches?"
+      - "Puppet::Provider::PbsApiToken::ProxmoxBackupServer#persist_secret"
+      - "Puppet::Provider::PbsBaseProvider#absent_state"
+      - "Puppet::Provider::PbsBaseProvider#missing_transport_result?"
+      - "Puppet::Provider::PbsBaseProvider#to_bool"
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer#canonicalize"
+      - "Puppet::Provider::PbsNodeConfig::ProxmoxBackupServer#local_node_name"
+      - "Puppet::Provider::PbsUser::ProxmoxBackupServer#pbs_realm_userid?"
+      - "Puppet::Transport::ProxmoxBackupServer#expand_path"
+      # secret_matches? and unwrap_secret are SecretComparison template-method
+      # hooks that providers override; they stay instance methods by contract.
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#secret_matches?"
+      - "PuppetX::ProxmoxBackupServer::SecretComparison#unwrap_secret"

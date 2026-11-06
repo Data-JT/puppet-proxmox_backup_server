@@ -1,0 +1,54 @@
+---
+Gemfile:
+  optional:
+    ':development':
+      - gem: puppet-resource_api
+      - gem: reek
+        version: '~> 6.5'
+
+spec/spec_helper.rb:
+  mock_with: ':rspec'
+  spec_overrides:
+    - "require 'puppet/resource_api'"
+    - "require 'puppet/resource_api/simple_provider'"
+    - "require 'webmock/rspec'"
+
+.rubocop.yml:
+  default_configs:
+    RSpec/SubjectStub:
+      Description: Provider specs stub the inherited transport accessor to inject
+        the transport double; this is the conventional Resource API testing pattern.
+      Exclude:
+        - spec/unit/puppet/provider/**/*.rb
+        - spec/unit/puppet/transport/**/*.rb
+    RSpec/MessageSpies:
+      Description: Existing specs consistently use the receive style.
+      EnforcedStyle: receive
+
+.gitignore:
+  paths:
+    - '/.claude/'
+    - '/Claude.md'
+    - '/CLAUDE.md'
+    - '/.agents/'
+    - '/.codex/'
+    - '/.cursorrules'
+    - '/.aider*'
+    - '/reek.json'
+    - '/.superpowers/'
+    - '/docs/superpowers/'
+
+.pdkignore:
+  paths:
+    - '/.claude/'
+    - '/Claude.md'
+    - '/CLAUDE.md'
+    - '/.agents/'
+    - '/.codex/'
+    - '/.cursorrules'
+    - '/.aider*'
+    - '/reek.json'
+    - '/.superpowers/'
+    - '/docs/superpowers/'
+    - '/.githooks/'
+    - '/.reek.yml'
