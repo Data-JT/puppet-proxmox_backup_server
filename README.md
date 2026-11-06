@@ -42,9 +42,16 @@ that description with the live configuration and changes only what differs.
 ### How it works
 
 ```text
-Hiera / manifest ──> proxmox_backup_server class ──> pbs_transport.yaml (token, 0600)
-                                                          │
-Puppet agent on the PBS node ──> pbs_* types ──> https://localhost:8007 (PBS REST API)
+Hiera / manifest              declares the class and the resources
+      │
+      ▼
+proxmox_backup_server class   writes pbs_transport.yaml (token, 0600)
+      │
+      ▼
+pbs_* types                   read that file on every agent run on the PBS node
+      │
+      ▼
+PBS REST API                  https://localhost:8007
 ```
 
 The `proxmox_backup_server` class writes the API token and connection settings to a transport
