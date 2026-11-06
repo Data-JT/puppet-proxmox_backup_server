@@ -102,7 +102,7 @@ DEFAULT_OPTIONS = {
   port:                         8007,
   ssl_verify:                   true,
   skip_errors:                  false,
-  remote_password_placeholder:  'CHANGE_ME_WRITE_ONLY_REMOTE_PASSWORD',
+  remote_password_placeholder:  nil,
   include_transport_parameters: false,
 }.freeze
 
@@ -173,9 +173,8 @@ def normalize_entry(entry, mapping, options)
     attributes[puppet_field] = value
   end
 
-  if mapping[:password_placeholder]
-    attributes['password'] = options.fetch(:remote_password_placeholder)
-  end
+  placeholder = options[:remote_password_placeholder]
+  attributes['password'] = placeholder if mapping[:password_placeholder] && placeholder
 
   attributes
 end
@@ -265,7 +264,7 @@ def parse_options(argv)
     opts.on('--include-transport-parameters', 'Also emit proxmox_backup_server class parameters') do
       options[:include_transport_parameters] = true
     end
-    opts.on('--remote-password-placeholder VALUE', 'Placeholder for write-only remote passwords') do |value|
+    opts.on('--remote-password-placeholder VALUE', 'Emit VALUE as the password of imported remotes (default: omit it)') do |value|
       options[:remote_password_placeholder] = value
     end
     opts.on('-h', '--help', 'Show this help') do

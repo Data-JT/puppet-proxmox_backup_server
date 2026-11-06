@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `tools/pbs_hiera_import.rb` no longer writes a placeholder as the `password` of imported
+  remotes, which Puppet would have sent to PBS if it was not replaced. The key is omitted, and
+  `--remote-password-placeholder` still adds a marker on request.
+
 ## [0.1.0] - 2026-11-06
 
 Initial release.

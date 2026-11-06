@@ -48,9 +48,9 @@ Existing PBS resources that are absent from the Hiera data are not purged by thi
 
 ## Remote passwords
 
-Remote passwords are not returned by the PBS API. Imported `pbs_remote` entries therefore contain
-the placeholder `CHANGE_ME_WRITE_ONLY_REMOTE_PASSWORD`. Replace it with the real secret (encrypted)
-before the first non-noop run: the password is drift-checked against `remote.cfg` (see
-[Secret drift detection](secret-drift.md)), so Puppet would otherwise write the placeholder to PBS.
-The `--noop` pass shows this as a `password changed` notice. Alternatively, remove the `password`
-key to leave an existing remote's password unmanaged.
+Remote passwords are not returned by the PBS API, so imported `pbs_remote` entries contain no
+`password` key. An existing remote keeps its password and Puppet leaves it unmanaged. To manage
+it, add the real secret (encrypted): it is then drift-checked against `remote.cfg` (see
+[Secret drift detection](secret-drift.md)). A remote recreated on a new node needs the `password`
+key, because PBS cannot create one without it. `--remote-password-placeholder VALUE` writes VALUE
+into each entry as a marker; replace it before the first non-noop run, or Puppet writes it to PBS.
