@@ -20,6 +20,12 @@ module Puppet::Provider::PbsRealm; end
 class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBaseProvider
   REALM_TYPES = ['ldap', 'ad', 'openid'].freeze unless const_defined?(:REALM_TYPES)
 
+  # Properties a realm type takes on create but its update endpoint refuses
+  # ("schema does not allow additional properties"), read from the create and
+  # update schemas of PBS 4.2.12. PBS keys a realm's users by this claim, so
+  # changing it means recreating the realm, as with `type`.
+  CREATE_ONLY = { 'openid' => [:username_claim] }.freeze unless const_defined?(:CREATE_ONLY)
+
   def self.attribute_map
     {
       'realm'                 => :realm,
@@ -72,12 +78,14 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
 
   def get(context)
     @type_by_realm = {}
+    @username_claim_by_realm = {}
     results = []
     REALM_TYPES.each do |realm_type|
       items = transport_get(context, "/config/access/#{realm_type}") || []
       items.each do |item|
         puppet_hash = pbs_to_puppet(item).merge(ensure: 'present', type: realm_type)
         @type_by_realm[item['realm']] = realm_type
+        @username_claim_by_realm[item['realm']] = item['username-claim'] if realm_type == 'openid'
         results << puppet_hash.merge(secret_placeholders(puppet_hash))
       end
     end
@@ -93,8 +101,10 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
   def update(context, name, should)
     realm_type = should[:type]
     validate_type_unchanged(name, realm_type)
+    validate_username_claim_unchanged(name, should) if realm_type == 'openid'
     context.notice("Updating #{realm_type} realm '#{name}'")
-    pbs_transport(context).put(context, "/config/access/#{realm_type}/#{name}", update_body(context, should))
+    pbs_transport(context).put(context, "/config/access/#{realm_type}/#{name}",
+                               update_body(context, should.except(*CREATE_ONLY.fetch(realm_type, []))))
   end
 
   def delete(context, name)
@@ -108,6 +118,17 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
   end
 
   private
+
+  def validate_username_claim_unchanged(name, should)
+    return unless should.key?(:username_claim) && @username_claim_by_realm&.key?(name)
+
+    current = @username_claim_by_realm[name]
+    return if current == should[:username_claim]
+
+    raise Puppet::ResourceError,
+          "realm '#{name}' username_claim cannot be changed from #{current.inspect} to " \
+          "#{should[:username_claim].inspect}; recreate the resource instead"
+  end
 
   def validate_type_unchanged(name, realm_type)
     current_type = @type_by_realm&.fetch(name, nil)

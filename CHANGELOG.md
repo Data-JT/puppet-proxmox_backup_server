@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `pbs_realm`: updating an existing `openid` realm no longer fails with "'username-claim':
+  schema does not allow additional properties". PBS takes `username-claim` only on create, so
+  it is left out of the update body; a changed `username_claim` now fails with a clear
+  "recreate the resource" error instead, as a changed `type` already did.
+
 ## [0.1.1] - 2026-11-06
 
 ### Fixed

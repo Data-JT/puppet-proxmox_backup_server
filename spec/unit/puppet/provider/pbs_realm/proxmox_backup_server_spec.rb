@@ -259,6 +259,41 @@ RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
       provider.update(context, 'r', should)
     end
 
+    it 'leaves the create-only username-claim out of an openid PUT body' do
+      stub_all_empty
+      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
+                                            .and_return([{ 'realm' => 'sso', 'username-claim' => 'username' }])
+      provider.get(context)
+
+      should = { realm: 'sso', type: 'openid', username_claim: 'username', comment: 'x', ensure: 'present' }
+      expect(mock_transport).to receive(:put) do |_ctx, _path, body|
+        expect(body).not_to have_key('username-claim')
+        expect(body).to include('comment' => 'x')
+      end
+      provider.update(context, 'sso', should)
+    end
+
+    it 'rejects changing the username_claim of an existing openid realm' do
+      stub_all_empty
+      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
+                                            .and_return([{ 'realm' => 'sso', 'username-claim' => 'username' }])
+      provider.get(context)
+
+      should = { realm: 'sso', type: 'openid', username_claim: 'email', ensure: 'present' }
+      expect(mock_transport).not_to receive(:put)
+      expect { provider.update(context, 'sso', should) }
+        .to raise_error(Puppet::ResourceError, %r{username_claim cannot be changed from "username" to "email"})
+    end
+
+    it 'still sends username-claim on create' do
+      should = { realm: 'sso', type: 'openid', issuer_url: 'https://i', client_id: 'c',
+                 username_claim: 'username', ensure: 'present' }
+      expect(mock_transport).to receive(:post) do |_ctx, _path, body|
+        expect(body).to include('username-claim' => 'username')
+      end
+      provider.create(context, 'sso', should)
+    end
+
     it 'rejects changing the cached realm type' do
       stub_all_empty
       allow(mock_transport).to receive(:get).with(context, '/config/access/ldap', any_args)
