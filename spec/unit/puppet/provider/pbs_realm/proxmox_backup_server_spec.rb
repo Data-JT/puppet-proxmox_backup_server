@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'puppet/provider/pbs_base_provider'
 require 'puppet/provider/pbs_realm/proxmox_backup_server'
+require 'puppet/type/pbs_realm'
 
 RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
   subject(:provider) { described_class.new }
@@ -18,7 +19,7 @@ RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
 
   before(:each) do
     allow(provider).to receive(:pbs_transport).and_return(mock_transport)
-    allow(mock_type).to receive(:namevars).and_return([:realm])
+    allow(mock_type).to receive_messages(namevars: [:realm], attributes: Puppet::Type.type(:pbs_realm).type_definition.attributes)
     allow(context).to receive(:notice)
     allow(context).to receive(:err)
   end
@@ -97,6 +98,21 @@ RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
         client_id:      'proxmox-backup',
         username_claim: 'email',
       )
+    end
+
+    # PBS logs in with the "sub" claim when a realm stores none.
+    it 'reports username_claim "sub" for an OpenID realm stored without one' do
+      stub_all_empty
+      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
+                                            .and_return([{ 'realm' => 'sso', 'issuer-url' => 'https://i' }])
+      expect(provider.get(context).first).to include(username_claim: 'sub')
+    end
+
+    it 'reports no username_claim for an LDAP realm' do
+      stub_all_empty
+      allow(mock_transport).to receive(:get).with(context, '/config/access/ldap', any_args)
+                                            .and_return([{ 'realm' => 'corp' }])
+      expect(provider.get(context).first).not_to have_key(:username_claim)
     end
 
     it 'converts verify boolean true' do
@@ -260,29 +276,12 @@ RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
     end
 
     it 'leaves the create-only username-claim out of an openid PUT body' do
-      stub_all_empty
-      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
-                                            .and_return([{ 'realm' => 'sso', 'username-claim' => 'username' }])
-      provider.get(context)
-
       should = { realm: 'sso', type: 'openid', username_claim: 'username', comment: 'x', ensure: 'present' }
       expect(mock_transport).to receive(:put) do |_ctx, _path, body|
         expect(body).not_to have_key('username-claim')
         expect(body).to include('comment' => 'x')
       end
       provider.update(context, 'sso', should)
-    end
-
-    it 'rejects changing the username_claim of an existing openid realm' do
-      stub_all_empty
-      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
-                                            .and_return([{ 'realm' => 'sso', 'username-claim' => 'username' }])
-      provider.get(context)
-
-      should = { realm: 'sso', type: 'openid', username_claim: 'email', ensure: 'present' }
-      expect(mock_transport).not_to receive(:put)
-      expect { provider.update(context, 'sso', should) }
-        .to raise_error(Puppet::ResourceError, %r{username_claim cannot be changed from "username" to "email"})
     end
 
     it 'still sends username-claim on create' do
@@ -293,16 +292,58 @@ RSpec.describe Puppet::Provider::PbsRealm::ProxmoxBackupServer do
       end
       provider.create(context, 'sso', should)
     end
+  end
 
-    it 'rejects changing the cached realm type' do
+  describe '#set' do
+    def change(is, should)
+      { is: is.merge(ensure: 'present'), should: should.merge(ensure: 'present') }
+    end
+
+    it 'rejects changing the username_claim of an existing openid realm' do
+      expect(mock_transport).not_to receive(:put)
+      expect {
+        provider.set(context, 'sso' => change({ realm: 'sso', type: 'openid', username_claim: 'username' },
+                                              { realm: 'sso', type: 'openid', username_claim: 'email' }))
+      }.to raise_error(Puppet::ResourceError,
+                       %r{sso: username_claim cannot be changed from "username" to "email"; recreate the resource instead})
+    end
+
+    it 'rejects changing the realm type' do
+      expect(mock_transport).not_to receive(:put)
+      expect {
+        provider.set(context, 'corp' => change({ realm: 'corp', type: 'ldap' }, { realm: 'corp', type: 'ad' }))
+      }.to raise_error(Puppet::ResourceError, %r{type cannot be changed from "ldap" to "ad"; recreate the resource instead})
+    end
+
+    it 'accepts declaring the default "sub" on a realm stored without a claim' do
       stub_all_empty
-      allow(mock_transport).to receive(:get).with(context, '/config/access/ldap', any_args)
-                                            .and_return([{ 'realm' => 'corp' }])
-      provider.get(context)
+      allow(mock_transport).to receive(:get).with(context, '/config/access/openid', any_args)
+                                            .and_return([{ 'realm' => 'sso', 'comment' => 'old' }])
+      is = provider.get(context).first
+      allow(mock_type).to receive_messages(feature?: false, ensurable?: true)
+      allow(context).to receive(:updating).and_yield
+      expect(mock_transport).to receive(:put) do |_ctx, _path, body|
+        expect(body).to eq('comment' => 'new')
+      end
+      provider.set(context, 'sso' => { is: is, should: { realm: 'sso', type: 'openid', username_claim: 'sub',
+                                                         comment: 'new', ensure: 'present' } })
+    end
 
-      should = { realm: 'corp', type: 'ad', ensure: 'present' }
-      expect { provider.update(context, 'corp', should) }
-        .to raise_error(Puppet::ResourceError, %r{type cannot be changed from ldap to ad})
+    it 'rejects an attribute of another realm type before creating anything' do
+      expect(mock_transport).not_to receive(:post)
+      expect {
+        provider.set(context, 'corp' => { is: { realm: 'corp', ensure: 'absent' },
+                                          should: { realm: 'corp', type: 'ad', server1: 'dc1', user_attr: 'uid',
+                                                    ensure: 'present' } })
+      }.to raise_error(Puppet::ResourceError, %r{corp: user_attr does not apply to type ad})
+    end
+
+    it 'rejects LDAP attributes on an openid realm' do
+      expect(mock_transport).not_to receive(:put)
+      expect {
+        provider.set(context, 'sso' => change({ realm: 'sso', type: 'openid' },
+                                              { realm: 'sso', type: 'openid', server1: 'x', bind_dn: 'cn=x' }))
+      }.to raise_error(Puppet::ResourceError, %r{sso: server1, bind_dn do not apply to type openid})
     end
   end
 

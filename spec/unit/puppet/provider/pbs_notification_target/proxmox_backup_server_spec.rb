@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'puppet/provider/pbs_base_provider'
 require 'puppet/provider/pbs_notification_target/proxmox_backup_server'
+require 'puppet/type/pbs_notification_target'
 
 RSpec.describe Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer do
   subject(:provider) { described_class.new }
@@ -22,7 +23,7 @@ RSpec.describe Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer do
     # No example touches a real /etc/proxmox-backup; the priv file is stubbed.
     allow(store).to receive_messages(available?: true, notification_secrets: [])
     allow(provider).to receive(:pbs_transport).and_return(mock_transport)
-    allow(mock_type).to receive(:namevars).and_return([:name])
+    allow(mock_type).to receive_messages(namevars: [:name], attributes: Puppet::Type.type(:pbs_notification_target).type_definition.attributes)
     allow(context).to receive(:notice)
     allow(context).to receive(:err)
   end
@@ -286,16 +287,24 @@ RSpec.describe Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer do
       end
       provider.update(context, 'alerts', should)
     end
+  end
 
-    it 'rejects changing the cached target type' do
-      stub_all_empty
-      allow(mock_transport).to receive(:get).with(context, '/config/notifications/endpoints/smtp', any_args)
-                                            .and_return([{ 'name' => 'relay' }])
-      provider.get(context)
+  describe '#set' do
+    it 'rejects changing the target type' do
+      expect(mock_transport).not_to receive(:put)
+      expect {
+        provider.set(context, 'relay' => { is: { name: 'relay', type: 'smtp', ensure: 'present' },
+                                           should: { name: 'relay', type: 'gotify', ensure: 'present' } })
+      }.to raise_error(Puppet::ResourceError, %r{relay: type cannot be changed from "smtp" to "gotify"; recreate the resource instead})
+    end
 
-      should = { name: 'relay', type: 'gotify', ensure: 'present' }
-      expect { provider.update(context, 'relay', should) }
-        .to raise_error(Puppet::ResourceError, %r{type cannot be changed from smtp to gotify})
+    it 'rejects an attribute of another target type before creating anything' do
+      expect(mock_transport).not_to receive(:post)
+      expect {
+        provider.set(context, 'hook' => { is: { name: 'hook', ensure: 'absent' },
+                                          should: { name: 'hook', type: 'webhook', url: 'https://h', mailto: ['a@b'],
+                                                    ensure: 'present' } })
+      }.to raise_error(Puppet::ResourceError, %r{hook: mailto does not apply to type webhook})
     end
   end
 

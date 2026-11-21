@@ -484,7 +484,7 @@ Garbage collection schedule (PBS schedule string or cron format).
 
 Data type: `String`
 
-Absolute filesystem path on the PBS host. Create-only: PBS rejects path changes on existing datastores; delete and recreate the datastore to move it.
+Absolute filesystem path on the PBS host. Cannot be changed after creation: PBS rejects path changes on existing datastores; delete and recreate the datastore to move it.
 
 #### Parameters
 
@@ -704,7 +704,9 @@ The matcher name. Must start with a letter, digit, or underscore and may contain
 The `type` attribute selects the delivery mechanism and determines which of
 the remaining attributes apply: sendmail/smtp targets use the mail-related
 attributes, gotify targets use `server` and `token`, and webhook targets use
-`url`, `http_method`, `body`, `header`, and `secret`.
+`url`, `http_method`, `body`, `header`, and `secret`. Declaring an attribute
+that does not apply to the type fails the run before anything is sent to
+PBS. `type` cannot be changed on an existing target; recreate it instead.
 
 #### Examples
 
@@ -860,7 +862,7 @@ Gotify authentication token. PBS never returns it, so drift is detected against 
 
 Data type: `Enum[sendmail, smtp, gotify, webhook]`
 
-Target type. Determines the delivery mechanism. Cannot be changed after creation.
+Target type. Determines the delivery mechanism. Cannot be changed after creation; recreate the target instead.
 
 ##### `url`
 
@@ -1021,6 +1023,10 @@ remaining attributes apply:
   auto-detected and `user_attr` is not used.
 * `openid`: `issuer_url` (required), `client_id` (required), `client_key`,
   `username_claim`, `autocreate`, `scopes`, `prompt`, `acr_values`, `audiences`.
+
+Declaring an attribute that does not apply to the realm's type fails the
+run before anything is sent to PBS. `type` and `username_claim` cannot be
+changed on an existing realm; recreate it instead.
 
 #### Examples
 
@@ -1201,7 +1207,7 @@ Default options for realm sync (e.g. scope=subtree).
 
 Data type: `Enum['ldap', 'ad', 'openid']`
 
-Realm type. Cannot be changed after creation.
+Realm type. Cannot be changed after creation; recreate the realm instead.
 
 ##### `user_attr`
 
@@ -1219,7 +1225,7 @@ Comma-separated LDAP object classes treated as user accounts.
 
 Data type: `Optional[String]`
 
-JWT claim used as the PBS username (e.g. email, sub).
+JWT claim used as the PBS username (e.g. email, sub). A realm without one uses "sub". Cannot be changed after creation; recreate the realm instead.
 
 ##### `verify`
 

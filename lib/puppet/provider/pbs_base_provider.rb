@@ -3,6 +3,7 @@
 require 'puppet/resource_api/simple_provider'
 require 'yaml'
 require_relative '../../puppet_x/proxmox_backup_server/secret_comparison'
+require_relative '../../puppet_x/proxmox_backup_server/change_check'
 
 # Base provider with shared PBS attribute mapping helpers.
 class Puppet::Provider::PbsBaseProvider < Puppet::ResourceApi::SimpleProvider
@@ -75,7 +76,31 @@ class Puppet::Provider::PbsBaseProvider < Puppet::ResourceApi::SimpleProvider
 
   def set(context, changes)
     changes = refresh_changes(context, changes) if @transport_config_missing
+    changes.each { |name, change| PuppetX::ProxmoxBackupServer::ChangeCheck.new(name, change).run(self.class, context) }
     super
+  end
+
+  # Type-specific attributes for each value of `type`, for providers whose
+  # resources live under a per-type endpoint. Attributes listed for no type
+  # (comment, the namevars) apply to all of them. nil: the resource has no
+  # types to tell apart.
+  def self.attributes_by_type
+    nil
+  end
+
+  # Attributes PBS takes when a resource is created and refuses afterwards.
+  # The type marks them `behaviour: :init_only`; a provider adds those that
+  # are fixed only for some values of `type`.
+  def self.create_only_attributes(context, _resource)
+    context.type.attributes.select { |_name, options| options[:behaviour] == :init_only }.keys
+  end
+
+  # The update request without the create-only attributes, which the update
+  # endpoints refuse. set has already rejected a change to any of them, so
+  # what is left out here is unchanged.
+  def without_create_only(context, declared)
+    create_only = self.class.create_only_attributes(context, declared)
+    declared.reject { |attribute, _value| create_only.include?(attribute) }
   end
 
   # Secrets are handled by SecretComparison#insync?, reached through super.

@@ -5,7 +5,8 @@ Examples for `pbs_notification_target` (delivery endpoints) and `pbs_notificatio
 [REFERENCE.md](../REFERENCE.md#pbs_notification_target).
 
 The `type` of a target cannot be changed after creation. To switch types, set `ensure => absent`
-and re-create the resource with the new type.
+and re-create the resource with the new type. Attributes that do not belong to the target's `type`
+(for example `mailto` on a `webhook` target) fail the run before anything is sent to PBS.
 
 ## Sendmail target
 

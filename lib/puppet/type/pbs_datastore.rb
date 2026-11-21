@@ -35,8 +35,9 @@ Puppet::ResourceApi.register_type(
       behaviour: :namevar,
     },
     path: {
-      type: 'String',
-      desc: 'Absolute filesystem path on the PBS host. Create-only: PBS rejects path changes on existing datastores; delete and recreate the datastore to move it.',
+      type:      'String',
+      desc:      'Absolute filesystem path on the PBS host. Cannot be changed after creation: PBS rejects path changes on existing datastores; delete and recreate the datastore to move it.',
+      behaviour: :init_only,
     },
     comment: {
       type: 'Optional[String]',

@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'puppet/provider/pbs_base_provider'
 require 'puppet/provider/pbs_datastore/proxmox_backup_server'
+require 'puppet/type/pbs_datastore'
 
 RSpec.describe Puppet::Provider::PbsDatastore::ProxmoxBackupServer do
   subject(:provider) { described_class.new }
@@ -18,7 +19,7 @@ RSpec.describe Puppet::Provider::PbsDatastore::ProxmoxBackupServer do
 
   before(:each) do
     allow(provider).to receive(:pbs_transport).and_return(mock_transport)
-    allow(mock_type).to receive(:namevars).and_return([:name])
+    allow(mock_type).to receive_messages(namevars: [:name], attributes: Puppet::Type.type(:pbs_datastore).type_definition.attributes)
     allow(context).to receive(:notice)
     allow(context).to receive(:err)
     allow(mock_transport).to receive(:wait_for_task)
@@ -163,14 +164,12 @@ RSpec.describe Puppet::Provider::PbsDatastore::ProxmoxBackupServer do
     end
 
     it 'raises when the manifest path differs from the existing datastore path (create-only)' do
-      allow(mock_transport).to receive(:get).with(context, '/config/datastore', any_args)
-                                            .and_return([{ 'name' => 'backup', 'path' => '/mnt/backup' }])
-      provider.get(context)
-
+      is = { name: 'backup', path: '/mnt/backup', ensure: 'present' }
       should = { name: 'backup', path: '/mnt/elsewhere', ensure: 'present' }
       expect(mock_transport).not_to receive(:put)
-      expect { provider.update(context, 'backup', should) }
-        .to raise_error(Puppet::ResourceError, %r{path is create-only.*'/mnt/backup'.*'/mnt/elsewhere'}m)
+      expect { provider.set(context, 'backup' => { is: is, should: should }) }
+        .to raise_error(Puppet::ResourceError,
+                        %r{backup: path cannot be changed from "/mnt/backup" to "/mnt/elsewhere"; recreate the resource instead})
     end
 
     it 'updates normally when the manifest path matches the existing path' do

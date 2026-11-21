@@ -157,8 +157,11 @@ detectors:
     exclude:
       - "Puppet::Transport::ProxmoxBackupServer"
   TooManyMethods:
-    # The transport centralizes its public HTTP and response-handling contract.
+    # The transport centralizes its public HTTP and response-handling contract,
+    # and the base provider the shared Resource API mapping, transport bootstrap
+    # and change checks, as in the PVE and PDM modules.
     exclude:
+      - "Puppet::Provider::PbsBaseProvider"
       - "Puppet::Transport::ProxmoxBackupServer"
   TooManyStatements:
     # These integration methods are clearer as one linear API operation.

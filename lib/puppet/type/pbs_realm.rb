@@ -20,6 +20,10 @@ Puppet::ResourceApi.register_type(
     * `openid`: `issuer_url` (required), `client_id` (required), `client_key`,
       `username_claim`, `autocreate`, `scopes`, `prompt`, `acr_values`, `audiences`.
 
+    Declaring an attribute that does not apply to the realm's type fails the
+    run before anything is sent to PBS. `type` and `username_claim` cannot be
+    changed on an existing realm; recreate it instead.
+
     @example An LDAP realm
       pbs_realm { 'corp-ldap':
         ensure        => present,
@@ -58,8 +62,9 @@ Puppet::ResourceApi.register_type(
       behaviour: :namevar,
     },
     type: {
-      type: "Enum['ldap', 'ad', 'openid']",
-      desc: 'Realm type. Cannot be changed after creation.',
+      type:      "Enum['ldap', 'ad', 'openid']",
+      desc:      'Realm type. Cannot be changed after creation; recreate the realm instead.',
+      behaviour: :init_only,
     },
     comment: {
       type: 'Optional[String]',
@@ -146,8 +151,9 @@ Puppet::ResourceApi.register_type(
       sensitive: true,
     },
     username_claim: {
-      type: 'Optional[String]',
-      desc: 'JWT claim used as the PBS username (e.g. email, sub).',
+      type:      'Optional[String]',
+      desc:      'JWT claim used as the PBS username (e.g. email, sub). A realm without one uses "sub". Cannot be changed after creation; recreate the realm instead.',
+      behaviour: :init_only,
     },
     autocreate: {
       type: 'Optional[Boolean]',

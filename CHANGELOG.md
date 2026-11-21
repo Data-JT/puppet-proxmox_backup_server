@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema does not allow additional properties". PBS takes `username-claim` only on create, so
   it is left out of the update body; a changed `username_claim` now fails with a clear
   "recreate the resource" error instead, as a changed `type` already did.
+- `pbs_realm`: an `openid` realm stored without a `username_claim` now reports `sub`, the
+  claim PBS logs in with then, so declaring `username_claim => 'sub'` on it is no change.
+
+### Changed
+
+- `pbs_realm` `type` and `username_claim`, `pbs_notification_target` `type` and
+  `pbs_datastore` `path` are now `init_only`, as in the PVE and PDM modules. The base provider
+  checks them for every resource, whatever Puppet's `strict` setting, and a change fails with
+  "<attribute> cannot be changed from X to Y; recreate the resource instead".
+- `pbs_realm` and `pbs_notification_target` reject an attribute that does not belong to their
+  `type` (for example `user_attr` on an `ad` realm) before anything is sent. Before, PBS refused
+  the request with "schema does not allow additional properties".
 
 ## [0.1.1] - 2026-11-06
 

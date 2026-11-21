@@ -20,11 +20,11 @@ module Puppet::Provider::PbsRealm; end
 class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBaseProvider
   REALM_TYPES = ['ldap', 'ad', 'openid'].freeze unless const_defined?(:REALM_TYPES)
 
-  # Properties a realm type takes on create but its update endpoint refuses
-  # ("schema does not allow additional properties"), read from the create and
-  # update schemas of PBS 4.2.12. PBS keys a realm's users by this claim, so
-  # changing it means recreating the realm, as with `type`.
-  CREATE_ONLY = { 'openid' => [:username_claim] }.freeze unless const_defined?(:CREATE_ONLY)
+  # PBS's login code reads `username-claim` with a fallback of "sub"
+  # (src/api2/access/openid.rs), so a realm stored without one behaves exactly
+  # like one stored with "sub". get reports it that way, or declaring the
+  # default on such a realm would read as a change to a create-only attribute.
+  DEFAULT_USERNAME_CLAIM = 'sub' unless const_defined?(:DEFAULT_USERNAME_CLAIM)
 
   def self.attribute_map
     {
@@ -44,8 +44,8 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
       'sync-defaults-options' => :sync_defaults_options,
       'sync-attributes'       => :sync_attributes,
       'user-classes'          => :user_classes,
-      # LDAP-only
       'base-dn'               => :base_dn,
+      # LDAP-only
       'user-attr'             => :user_attr,
       # OpenID
       'issuer-url'            => :issuer_url,
@@ -65,6 +65,19 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
     [:default, :verify, :autocreate]
   end
 
+  # Read from the create and update schemas of each realm endpoint in the PBS
+  # API viewer (PBS 4.2).
+  def self.attributes_by_type
+    {
+      'ldap'   => [:base_dn, :bind_dn, :bind_password, :capath, :default, :filter, :mode, :port, :server1, :server2,
+                   :sync_attributes, :sync_defaults_options, :user_attr, :user_classes, :verify],
+      'ad'     => [:base_dn, :bind_dn, :bind_password, :capath, :default, :filter, :mode, :port, :server1, :server2,
+                   :sync_attributes, :sync_defaults_options, :user_classes, :verify],
+      'openid' => [:acr_values, :audiences, :autocreate, :client_id, :client_key, :default, :issuer_url, :prompt,
+                   :scopes, :username_claim],
+    }
+  end
+
   def self.secret_attributes
     [:bind_password]
   end
@@ -78,14 +91,13 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
 
   def get(context)
     @type_by_realm = {}
-    @username_claim_by_realm = {}
     results = []
     REALM_TYPES.each do |realm_type|
       items = transport_get(context, "/config/access/#{realm_type}") || []
       items.each do |item|
         puppet_hash = pbs_to_puppet(item).merge(ensure: 'present', type: realm_type)
+        puppet_hash[:username_claim] ||= DEFAULT_USERNAME_CLAIM if realm_type == 'openid'
         @type_by_realm[item['realm']] = realm_type
-        @username_claim_by_realm[item['realm']] = item['username-claim'] if realm_type == 'openid'
         results << puppet_hash.merge(secret_placeholders(puppet_hash))
       end
     end
@@ -100,11 +112,9 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
 
   def update(context, name, should)
     realm_type = should[:type]
-    validate_type_unchanged(name, realm_type)
-    validate_username_claim_unchanged(name, should) if realm_type == 'openid'
     context.notice("Updating #{realm_type} realm '#{name}'")
     pbs_transport(context).put(context, "/config/access/#{realm_type}/#{name}",
-                               update_body(context, should.except(*CREATE_ONLY.fetch(realm_type, []))))
+                               update_body(context, without_create_only(context, should)))
   end
 
   def delete(context, name)
@@ -115,26 +125,5 @@ class Puppet::Provider::PbsRealm::ProxmoxBackupServer < Puppet::Provider::PbsBas
     end
     context.notice("Deleting realm '#{name}'")
     pbs_transport(context).delete(context, "/config/access/#{realm_type}/#{name}")
-  end
-
-  private
-
-  def validate_username_claim_unchanged(name, should)
-    return unless should.key?(:username_claim) && @username_claim_by_realm&.key?(name)
-
-    current = @username_claim_by_realm[name]
-    return if current == should[:username_claim]
-
-    raise Puppet::ResourceError,
-          "realm '#{name}' username_claim cannot be changed from #{current.inspect} to " \
-          "#{should[:username_claim].inspect}; recreate the resource instead"
-  end
-
-  def validate_type_unchanged(name, realm_type)
-    current_type = @type_by_realm&.fetch(name, nil)
-    return unless current_type && current_type != realm_type
-
-    raise Puppet::ResourceError,
-          "realm '#{name}' type cannot be changed from #{current_type} to #{realm_type}; recreate the resource instead"
   end
 end

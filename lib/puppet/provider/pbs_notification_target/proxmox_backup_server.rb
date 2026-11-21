@@ -44,6 +44,18 @@ class Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer < Puppet::Pro
     [:disable]
   end
 
+  # Read from the create and update schemas of each endpoint type in the PBS
+  # API viewer (PBS 4.2).
+  def self.attributes_by_type
+    {
+      'sendmail' => [:author, :disable, :from_address, :mailto, :mailto_user],
+      'smtp'     => [:author, :disable, :from_address, :mailto, :mailto_user, :mode, :port, :server, :smtp_password,
+                     :username],
+      'gotify'   => [:disable, :server, :token],
+      'webhook'  => [:body, :disable, :header, :http_method, :secret, :url],
+    }
+  end
+
   def self.secret_attributes
     SECRET_FIELDS.keys
   end
@@ -85,7 +97,6 @@ class Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer < Puppet::Pro
 
   def update(context, name, should)
     target_type = should[:type]
-    validate_type_unchanged(name, target_type)
     context.notice("Updating #{target_type} notification target '#{name}'")
     pbs_transport(context).put(context, "/config/notifications/endpoints/#{target_type}/#{name}", update_body(context, should))
   end
@@ -138,13 +149,5 @@ class Puppet::Provider::PbsNotificationTarget::ProxmoxBackupServer < Puppet::Pro
       key, value = pair.split('=', 2)
       result[key] = value
     end
-  end
-
-  def validate_type_unchanged(name, target_type)
-    current_type = @type_by_name&.fetch(name, nil)
-    return unless current_type && current_type != target_type
-
-    raise Puppet::ResourceError,
-          "notification target '#{name}' type cannot be changed from #{current_type} to #{target_type}; recreate the resource instead"
   end
 end

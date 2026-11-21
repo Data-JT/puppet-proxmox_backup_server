@@ -12,7 +12,9 @@ Puppet::ResourceApi.register_type(
     The `type` attribute selects the delivery mechanism and determines which of
     the remaining attributes apply: sendmail/smtp targets use the mail-related
     attributes, gotify targets use `server` and `token`, and webhook targets use
-    `url`, `http_method`, `body`, `header`, and `secret`.
+    `url`, `http_method`, `body`, `header`, and `secret`. Declaring an attribute
+    that does not apply to the type fails the run before anything is sent to
+    PBS. `type` cannot be changed on an existing target; recreate it instead.
 
     @example An SMTP relay target
       pbs_notification_target { 'smtp-relay':
@@ -53,8 +55,9 @@ Puppet::ResourceApi.register_type(
       behaviour: :namevar,
     },
     type: {
-      type: 'Enum[sendmail, smtp, gotify, webhook]',
-      desc: 'Target type. Determines the delivery mechanism. Cannot be changed after creation.',
+      type:      'Enum[sendmail, smtp, gotify, webhook]',
+      desc:      'Target type. Determines the delivery mechanism. Cannot be changed after creation; recreate the target instead.',
+      behaviour: :init_only,
     },
     disable: {
       type: 'Optional[Boolean]',

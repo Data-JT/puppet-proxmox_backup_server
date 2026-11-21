@@ -212,7 +212,10 @@ Every attribute, the class parameters and the `pbs_api_request` task are documen
   secret's store cannot be read, the run fails rather than reporting the resource in sync.
 - `pbs_user` passwords can be managed only for users in the `@pbs` realm.
 - `pbs_node_config` must be titled with the node's short hostname.
-- The `type` of a realm or notification target cannot be changed; remove and re-create it.
+- The `type` of a realm or notification target, an `openid` realm's `username_claim` and a
+  datastore's `path` cannot be changed.
+  The run fails before calling PBS, whatever Puppet's `strict` setting; remove and re-create the
+  resource. An attribute that does not belong to the declared `type` is rejected the same way.
 
 ## Contributing
 

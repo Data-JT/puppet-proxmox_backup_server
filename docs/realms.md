@@ -7,6 +7,11 @@ The `type` attribute selects the backend and routes to the corresponding PBS API
 (`/config/access/{type}`). It cannot be changed after creation: to switch types, set
 `ensure => absent` and re-create the realm.
 
+`username_claim` is fixed at creation as well, since the realm's users are keyed by it. A realm
+stored without one reports `sub`, the claim PBS then logs in with, so declaring `sub` on it is
+no change. Attributes that do not belong to the realm's `type` (for example `user_attr` on an
+`ad` realm) fail the run before anything is sent to PBS.
+
 ## LDAP
 
 ```puppet
