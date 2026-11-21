@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-21
+
 ### Fixed
 
 - `pbs_realm`: updating an existing `openid` realm no longer fails with "'username-claim':
@@ -86,6 +88,7 @@ Initial release.
 - `tools/pbs_hiera_import.rb`, a checkout-only tool that generates Hiera data from an
   existing PBS instance. It is not part of the Forge package.
 
-[Unreleased]: https://github.com/Data-JT/puppet-proxmox_backup_server/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Data-JT/puppet-proxmox_backup_server/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Data-JT/puppet-proxmox_backup_server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Data-JT/puppet-proxmox_backup_server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Data-JT/puppet-proxmox_backup_server/releases/tag/v0.1.0
